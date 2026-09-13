@@ -11,6 +11,12 @@ repos:
         args: [--args=--config=__GIT_WORKING_DIR__/.tflint.hcl]
       # trivy was already installed and the gate ran no scanner at all.
       # HIGH,CRITICAL only: a gate that fires on advisories gets disabled.
+      #
+      # The binary comes from PATH, as it does for terraform and tflint, and CI
+      # installs it in the same pinned version. --hook-config=--tool-version is
+      # the documented alternative and does not work here: its downloader fails
+      # to match trivy's macOS-ARM64 release asset, so it would break the gate
+      # on a laptop while passing on a Linux runner.
       - id: terraform_trivy
         args: [--args=--severity=HIGH,CRITICAL]
 
