@@ -29,7 +29,7 @@ jobs:
           # are applied from a laptop, and CI can authenticate to neither: it has
           # no role on the bootstrap state container and no Databricks account
           # admin. Planning them here would fail for the right reason, noisily.
-          targets=$(find infra/stacks/platform -path '*/envs/*.tfvars' \
+          targets=$(find infra/stacks/platform infra/stacks/governance -path '*/envs/*.tfvars' \
             | sed -E 's|(.*)/envs/(.*)\.tfvars|{"stack":"\1","target":"\2"}|' \
             | jq -sc .)
           echo "targets=${targets}" >> "$GITHUB_OUTPUT"

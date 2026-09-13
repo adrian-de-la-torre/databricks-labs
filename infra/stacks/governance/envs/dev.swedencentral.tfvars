@@ -1,0 +1,7 @@
+environment             = "dev"
+workspace_url           = "https://adb-7405619929307958.18.azuredatabricks.net"
+workspace_id            = "7405619929307958"
+workspace_resource_id   = "/subscriptions/e8ab24b0-ab6b-4df0-88ad-5f3630000853/resourceGroups/rg-dbxlab-dev-sdc/providers/Microsoft.Databricks/workspaces/dbw-dbxlab-dev-sdc"
+catalog_storage_url     = "abfss://unity@stdbxlabdevsdcdc6bab6c.dfs.core.windows.net/"
+storage_credential_name = "sc-dbxlab-dev"
+admin_group             = "labs-platform-admins"
