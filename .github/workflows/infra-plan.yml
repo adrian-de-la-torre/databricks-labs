@@ -42,7 +42,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - uses: azure/login@v2
+      - uses: azure/login@v3
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID_PLAN }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
