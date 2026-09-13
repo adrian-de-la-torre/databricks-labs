@@ -12,3 +12,18 @@ output "resource_group_name" {
   description = "Resource group holding the workspace and its network."
   value       = azurerm_resource_group.this.name
 }
+
+output "catalog_storage_account_name" {
+  description = "ADLS Gen2 account backing the Unity Catalog catalog. Consumed by the governance stack."
+  value       = azurerm_storage_account.catalog.name
+}
+
+output "access_connector_id" {
+  description = "Access connector whose managed identity Unity Catalog authenticates with."
+  value       = azurerm_databricks_access_connector.this.id
+}
+
+output "catalog_storage_url" {
+  description = "abfss:// URL of the container holding managed tables."
+  value       = "abfss://${azurerm_storage_container.unity.name}@${azurerm_storage_account.catalog.name}.dfs.core.windows.net/"
+}

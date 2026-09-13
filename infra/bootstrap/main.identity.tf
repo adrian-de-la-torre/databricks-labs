@@ -8,6 +8,9 @@ locals {
 
   github_issuer = "https://token.actions.githubusercontent.com"
 
+  # Built-in role definition id, verified with `az role definition list`.
+  role_storage_blob_data_contributor = "ba92f5b4-2d11-453d-a403-e96b0029c9fe"
+
   # GitHub presents the IMMUTABLE subject format, which interleaves numeric ids:
   #   repo:<owner>@<owner_id>/<repo>@<repo_id>:<context>
   # The classic repo:<owner>/<repo>:<context> form is what most documentation

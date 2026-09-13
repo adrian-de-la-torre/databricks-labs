@@ -49,3 +49,44 @@ resource "azurerm_role_assignment" "plan_state_reader" {
   principal_id         = azurerm_user_assigned_identity.plan.principal_id
   principal_type       = "ServicePrincipal"
 }
+
+# Contributor cannot create role assignments, and Unity Catalog needs one: the
+# access connector's managed identity must hold Storage Blob Data Contributor on
+# the catalog's storage account.
+#
+# The usual shortcut is to grant the pipeline Owner. This grants Role Based Access
+# Control Administrator instead, with an ABAC condition that constrains it to
+# assigning exactly one role definition. The pipeline can therefore create the one
+# assignment Unity Catalog requires and cannot grant itself anything else --
+# notably not Owner, and not Contributor to a new principal.
+resource "azurerm_role_assignment" "apply_constrained_rbac_admin" {
+  for_each = var.environments
+
+  scope                = data.azurerm_subscription.current.id
+  role_definition_name = "Role Based Access Control Administrator"
+  principal_id         = azurerm_user_assigned_identity.apply[each.key].principal_id
+  principal_type       = "ServicePrincipal"
+
+  condition_version = "2.0"
+  condition         = <<-CONDITION
+    (
+      (
+        !(ActionMatches{'Microsoft.Authorization/roleAssignments/write'})
+      )
+      OR
+      (
+        @Request[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ForAnyOfAnyValues:GuidEquals{${local.role_storage_blob_data_contributor}}
+      )
+    )
+    AND
+    (
+      (
+        !(ActionMatches{'Microsoft.Authorization/roleAssignments/delete'})
+      )
+      OR
+      (
+        @Resource[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ForAnyOfAnyValues:GuidEquals{${local.role_storage_blob_data_contributor}}
+      )
+    )
+  CONDITION
+}

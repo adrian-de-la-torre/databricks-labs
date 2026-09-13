@@ -15,6 +15,14 @@ locals {
 
   suffix = "${local.workload}-${var.environment}-${local.location_short}"
 
+  # Storage account names are globally unique, lowercase alphanumeric, 3-24 chars.
+  # The hash keeps it deterministic: the same subscription, environment and region
+  # always produce the same name, so it is not a random value in state.
+  storage_account_name = substr(
+    "st${local.workload}${var.environment}${local.location_short}${substr(sha256("${data.azurerm_subscription.current.subscription_id}-${var.environment}-${var.location}"), 0, 8)}",
+    0, 24
+  )
+
   tags = {
     workload    = local.workload
     environment = var.environment
