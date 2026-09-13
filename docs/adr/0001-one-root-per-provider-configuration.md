@@ -24,9 +24,9 @@ three, so there are three planes plus bootstrap:
 | Root | Provider |
 |---|---|
 | `infra/bootstrap` | `azurerm` |
-| `infra/stacks/10-platform` | `azurerm` |
-| `infra/stacks/20-account` | `databricks`, account plane |
-| `infra/stacks/30-governance` | `databricks`, workspace plane |
+| `infra/stacks/platform` | `azurerm` |
+| `infra/stacks/account` | `databricks`, account plane |
+| `infra/stacks/governance` | `databricks`, workspace plane |
 
 ## Consequences
 

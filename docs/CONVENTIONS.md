@@ -19,10 +19,16 @@ model, not from taste.
 | Stack | Owns | Providers |
 |---|---|---|
 | `infra/bootstrap` | State store, CI identities, subscription budget | `azurerm` |
-| `infra/stacks/10-platform` | Everything with an ARM resource id | `azurerm` |
-| `infra/stacks/20-account` | Databricks account plane | `databricks` (account) |
-| `infra/stacks/30-governance` | Databricks workspace plane | `databricks` (workspace) |
+| `infra/stacks/platform` | Everything with an ARM resource id | `azurerm` |
+| `infra/stacks/account` | Databricks account plane | `databricks` (account) |
+| `infra/stacks/governance` | Databricks workspace plane | `databricks` (workspace) |
 | `labs/<NN>-<topic>` | One laboratory | none — Databricks bundle |
+
+They are applied in that order, and the order is documented here rather than
+encoded as a numeric prefix on each directory. A prefix would be duplicated into
+the remote state key, so inserting a layer or reordering would stop being a rename
+and become a state migration. Laboratories keep their numeric prefix: there the
+number is an identifier, not a dependency.
 
 ## Environments are files, not directories
 

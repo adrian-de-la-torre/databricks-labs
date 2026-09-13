@@ -15,7 +15,7 @@ The conventions that govern this repository are in [docs/CONVENTIONS.md](docs/CO
 ```
 infra/
   bootstrap/              State store, CI identities, subscription budget
-  stacks/10-platform/     Resource group, network, Databricks workspace
+  stacks/platform/     Resource group, network, Databricks workspace
 labs/
   <NN>-<topic>/           One experiment: bundle, results, cost
 docs/
@@ -62,7 +62,7 @@ choosing: `westeurope` currently rejects new subscriptions with
 az login
 ./infra/bootstrap/state-store.sh
 
-cd infra/stacks/10-platform
+cd infra/stacks/platform
 terraform init -backend-config=envs/dev.northeurope.tfbackend
 terraform plan  -var-file=envs/dev.northeurope.tfvars
 ```
