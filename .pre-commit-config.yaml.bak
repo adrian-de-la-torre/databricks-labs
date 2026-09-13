@@ -9,10 +9,6 @@ repos:
         args: [--tf-init-args=-backend=false]
       - id: terraform_tflint
         args: [--args=--config=__GIT_WORKING_DIR__/.tflint.hcl]
-      # trivy was already installed and the gate ran no scanner at all.
-      # HIGH,CRITICAL only: a gate that fires on advisories gets disabled.
-      - id: terraform_trivy
-        args: [--args=--severity=HIGH,CRITICAL]
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0

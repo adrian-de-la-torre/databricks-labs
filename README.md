@@ -63,8 +63,8 @@ az login
 ./infra/bootstrap/state-store.sh
 
 cd infra/stacks/platform
-terraform init -backend-config=envs/dev.northeurope.tfbackend
-terraform plan  -var-file=envs/dev.northeurope.tfvars
+terraform init -backend-config=envs/dev.swedencentral.tfbackend
+terraform plan  -var-file=envs/dev.swedencentral.tfvars
 ```
 
 ## Licence
