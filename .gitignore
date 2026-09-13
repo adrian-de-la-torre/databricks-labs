@@ -1,0 +1,35 @@
+# Terraform state — never committed. Holds every resource attribute in plaintext.
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.tfstate.lock.info
+crash.log
+crash.*.log
+tfplan
+*.tfplan
+
+# envs/*.tfvars and envs/*.tfbackend ARE committed on purpose: they are the
+# deployment coordinates of this platform and hold no secrets. Only locally
+# auto-loaded overrides are ignored.
+*.auto.tfvars
+override.tf
+override.tf.json
+*_override.tf
+
+# Databricks
+.databricks/
+.databrickscfg
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.ipynb_checkpoints/
+
+# Credentials
+.env
+*.pem
+*.key
+
+# macOS
+.DS_Store
