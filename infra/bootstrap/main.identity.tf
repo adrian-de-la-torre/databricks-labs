@@ -8,8 +8,18 @@ locals {
 
   github_issuer = "https://token.actions.githubusercontent.com"
 
-  # Built-in role definition id, verified with `az role definition list`.
-  role_storage_blob_data_contributor = "ba92f5b4-2d11-453d-a403-e96b0029c9fe"
+  # Built-in role definition ids, verified with `az role definition list`.
+  #
+  # Unity Catalog needs exactly two assignments and no more:
+  #   Storage Blob Data Contributor  the connector reads the catalog storage
+  #   Reader                         the connector reads ITSELF -- registering a
+  #                                  storage credential fails without it, with an
+  #                                  error that names the connector rather than
+  #                                  the missing role
+  assignable_role_ids = [
+    "ba92f5b4-2d11-453d-a403-e96b0029c9fe", # Storage Blob Data Contributor
+    "acdd72a7-3385-48ef-bd42-f606fba81ae7", # Reader
+  ]
 
   # GitHub presents the IMMUTABLE subject format, which interleaves numeric ids:
   #   repo:<owner>@<owner_id>/<repo>@<repo_id>:<context>

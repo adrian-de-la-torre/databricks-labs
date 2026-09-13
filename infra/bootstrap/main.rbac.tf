@@ -75,7 +75,7 @@ resource "azurerm_role_assignment" "apply_constrained_rbac_admin" {
       )
       OR
       (
-        @Request[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ForAnyOfAnyValues:GuidEquals{${local.role_storage_blob_data_contributor}}
+        @Request[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ForAnyOfAnyValues:GuidEquals{${join(", ", local.assignable_role_ids)}}
       )
     )
     AND
@@ -85,7 +85,7 @@ resource "azurerm_role_assignment" "apply_constrained_rbac_admin" {
       )
       OR
       (
-        @Resource[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ForAnyOfAnyValues:GuidEquals{${local.role_storage_blob_data_contributor}}
+        @Resource[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ForAnyOfAnyValues:GuidEquals{${join(", ", local.assignable_role_ids)}}
       )
     )
   CONDITION

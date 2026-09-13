@@ -76,3 +76,15 @@ resource "azurerm_role_assignment" "connector_on_catalog_storage" {
   principal_id         = azurerm_databricks_access_connector.this.identity[0].principal_id
   principal_type       = "ServicePrincipal"
 }
+
+# Unity Catalog refuses to register a storage credential unless the access
+# connector's managed identity can read the connector itself. The error names the
+# connector, not the missing role, which makes it hard to place: it reads as a
+# permissions problem with the credential rather than a self-referential Reader
+# assignment that nobody would think to create.
+resource "azurerm_role_assignment" "connector_reader_on_itself" {
+  scope                = azurerm_databricks_access_connector.this.id
+  role_definition_name = "Reader"
+  principal_id         = azurerm_databricks_access_connector.this.identity[0].principal_id
+  principal_type       = "ServicePrincipal"
+}
