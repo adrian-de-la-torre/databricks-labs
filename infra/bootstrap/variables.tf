@@ -14,6 +14,16 @@ variable "github_repository" {
   }
 }
 
+variable "github_owner_id" {
+  description = "Numeric GitHub account id. Part of the immutable subject format."
+  type        = number
+}
+
+variable "github_repository_id" {
+  description = "Numeric GitHub repository id. Part of the immutable subject format."
+  type        = number
+}
+
 variable "environments" {
   description = "Deployment environments that get a federated apply credential."
   type        = set(string)

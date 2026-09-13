@@ -7,6 +7,20 @@ locals {
   }
 
   github_issuer = "https://token.actions.githubusercontent.com"
+
+  # GitHub presents the IMMUTABLE subject format, which interleaves numeric ids:
+  #   repo:<owner>@<owner_id>/<repo>@<repo_id>:<context>
+  # The classic repo:<owner>/<repo>:<context> form is what most documentation
+  # still shows, and it produces AADSTS700213 with a subject that looks correct.
+  #
+  # The numeric ids are the point: they survive renaming the account or the
+  # repository, so the pipeline does not silently lose its identity the day
+  # someone tidies up a name.
+  github_subject_prefix = format(
+    "repo:%s@%d/%s@%d",
+    split("/", var.github_repository)[0], var.github_owner_id,
+    split("/", var.github_repository)[1], var.github_repository_id,
+  )
 }
 
 resource "azurerm_resource_group" "identity" {
@@ -51,7 +65,7 @@ resource "azurerm_federated_identity_credential" "plan_pull_request" {
   user_assigned_identity_id = azurerm_user_assigned_identity.plan.id
   audience                  = ["api://AzureADTokenExchange"]
   issuer                    = local.github_issuer
-  subject                   = "repo:${var.github_repository}:pull_request"
+  subject                   = "${local.github_subject_prefix}:pull_request"
 }
 
 resource "azurerm_federated_identity_credential" "apply_environment" {
@@ -61,5 +75,5 @@ resource "azurerm_federated_identity_credential" "apply_environment" {
   user_assigned_identity_id = azurerm_user_assigned_identity.apply[each.key].id
   audience                  = ["api://AzureADTokenExchange"]
   issuer                    = local.github_issuer
-  subject                   = "repo:${var.github_repository}:environment:${each.key}"
+  subject                   = "${local.github_subject_prefix}:environment:${each.key}"
 }
