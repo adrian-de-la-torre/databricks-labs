@@ -24,8 +24,10 @@ model, not from taste.
 | `infra/stacks/governance` | Databricks workspace plane | `databricks` (workspace) |
 | `labs/<NN>-<topic>` | One laboratory | none — Databricks bundle |
 
-They are applied in that order, and the order is documented here rather than
-encoded as a numeric prefix on each directory. A prefix would be duplicated into
+They are applied in that order. It is declared in `STACK_ORDER` in
+`.github/workflows/infra-apply.yml`, which is the only place that enforces it: a
+GitHub matrix does not guarantee ordering, not even with `max-parallel: 1`. The
+order is therefore documented here and enforced there, rather than A prefix would be duplicated into
 the remote state key, so inserting a layer or reordering would stop being a rename
 and become a state migration. Laboratories keep their numeric prefix: there the
 number is an identifier, not a dependency.

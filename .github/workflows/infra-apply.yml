@@ -14,6 +14,19 @@ concurrency:
   group: infra-apply
   cancel-in-progress: false
 
+env:
+  # The layering order, declared once and in the only place that enforces it.
+  #
+  # A GitHub matrix does NOT guarantee ordering, even with max-parallel: 1. An
+  # earlier version of this workflow generated the matrix with `find` and relied
+  # on the job sequence; governance ran before platform and failed on resources
+  # that did not exist yet.
+  #
+  # infra/bootstrap and infra/stacks/account are absent on purpose. Both are
+  # applied from a laptop: bootstrap defines the identities CI runs as, and
+  # account needs Databricks account admin, which Azure RBAC does not confer.
+  STACK_ORDER: platform governance
+
 jobs:
   discover:
     runs-on: ubuntu-latest
@@ -23,9 +36,10 @@ jobs:
       - uses: actions/checkout@v5
       - id: find
         run: |
-          targets=$(find infra/stacks -path '*/envs/*.tfvars' \
-            | sed -E 's|(.*)/envs/(.*)\.tfvars|{"stack":"\1","target":"\2","environment":"\2"}|' \
-            | sed -E 's|"environment":"([a-z]+)\.[a-z]+"|"environment":"\1"|' \
+          # One job per deployment target; stacks are applied in order INSIDE it.
+          targets=$(find infra/stacks/platform/envs -name '*.tfvars' \
+            | sed -E 's|.*/envs/(.*)\.tfvars|\1|' \
+            | sed -E 's|^([a-z]+)\.[a-z]+$|{"target":"&","environment":"\1"}|' \
             | jq -sc .)
           echo "targets=${targets}" >> "$GITHUB_OUTPUT"
 
@@ -33,13 +47,9 @@ jobs:
     needs: discover
     runs-on: ubuntu-latest
     strategy:
-      fail-fast: true
-      max-parallel: 1
+      fail-fast: false
       matrix:
         include: ${{ fromJson(needs.discover.outputs.targets) }}
-    # The environment is what binds this job to the federated credential whose
-    # subject ends in :environment:<name>. It is also where a required reviewer
-    # would be configured for anything that is not dev.
     environment: ${{ matrix.environment }}
     steps:
       - uses: actions/checkout@v5
@@ -55,8 +65,7 @@ jobs:
           terraform_version: 1.16.1
           terraform_wrapper: false
 
-      - name: apply
-        working-directory: ${{ matrix.stack }}
+      - name: apply stacks in order
         env:
           ARM_USE_OIDC: "true"
           ARM_USE_AZUREAD: "true"
@@ -64,9 +73,15 @@ jobs:
           ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
           ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
         run: |
-          terraform init -input=false -backend-config="envs/${{ matrix.target }}.tfbackend"
-          # Plan and apply in one step against the merged commit. Carrying a plan
-          # artefact from the pull request would apply a plan computed against
-          # pre-merge state.
-          terraform apply -input=false -auto-approve -no-color \
-            -var-file="envs/${{ matrix.target }}.tfvars"
+          set -euo pipefail
+          for stack in ${STACK_ORDER}; do
+            dir="infra/stacks/${stack}"
+            echo "::group::apply ${stack} (${{ matrix.target }})"
+            terraform -chdir="${dir}" init -input=false \
+              -backend-config="envs/${{ matrix.target }}.tfbackend"
+            # Plan and apply against the merged commit. A plan carried from the
+            # pull request would have been computed against pre-merge state.
+            terraform -chdir="${dir}" apply -input=false -auto-approve -no-color \
+              -var-file="envs/${{ matrix.target }}.tfvars"
+            echo "::endgroup::"
+          done
