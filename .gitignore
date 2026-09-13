@@ -33,3 +33,8 @@ __pycache__/
 
 # macOS
 .DS_Store
+
+# The agent configuration this repository declares is committed; the per-machine
+# override is not. settings.local.json is where anything non-Anthropic would live,
+# and it must never reach a public repository.
+.claude/settings.local.json
