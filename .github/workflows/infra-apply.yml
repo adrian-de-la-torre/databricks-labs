@@ -33,7 +33,7 @@ jobs:
     outputs:
       targets: ${{ steps.find.outputs.targets }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - id: find
         run: |
           # One job per deployment target; stacks are applied in order INSIDE it.
@@ -52,7 +52,7 @@ jobs:
         include: ${{ fromJson(needs.discover.outputs.targets) }}
     environment: ${{ matrix.environment }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - uses: azure/login@v2
         with:
