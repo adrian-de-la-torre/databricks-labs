@@ -1,0 +1,9 @@
+{
+  "recommendations": [
+    "hashicorp.terraform",
+    "databricks.databricks",
+    "ms-azuretools.vscode-azureresourcegroups",
+    "github.vscode-github-actions",
+    "redhat.vscode-yaml"
+  ]
+}

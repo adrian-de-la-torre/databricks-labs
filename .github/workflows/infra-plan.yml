@@ -1,0 +1,80 @@
+name: infra-plan
+
+on:
+  pull_request:
+    paths: ["infra/**", ".github/workflows/infra-*.yml"]
+
+# id-token: write is what lets the runner request an OIDC token. Without it the
+# federated credential can never be exchanged, and no amount of correct Azure
+# configuration helps.
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  # The matrix is generated from the envs/ directory, so adding an environment or
+  # a region is a two-file pull request that needs no workflow change.
+  discover:
+    runs-on: ubuntu-latest
+    # Fork pull requests get no identity. GitHub withholds the token anyway; being
+    # explicit means the job is skipped rather than failing confusingly.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    outputs:
+      targets: ${{ steps.find.outputs.targets }}
+    steps:
+      - uses: actions/checkout@v5
+      - id: find
+        run: |
+          # infra/bootstrap is deliberately excluded: it is applied from a
+          # laptop and CI holds no role on its state container.
+          targets=$(find infra/stacks -path '*/envs/*.tfvars' \
+            | sed -E 's|(.*)/envs/(.*)\.tfvars|{"stack":"\1","target":"\2"}|' \
+            | jq -sc .)
+          echo "targets=${targets}" >> "$GITHUB_OUTPUT"
+
+  plan:
+    needs: discover
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJson(needs.discover.outputs.targets) }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID_PLAN }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.16.1
+          terraform_wrapper: false
+
+      - name: plan
+        working-directory: ${{ matrix.stack }}
+        env:
+          ARM_USE_OIDC: "true"
+          ARM_USE_AZUREAD: "true"
+          ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID_PLAN }}
+          ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+        run: |
+          terraform init -input=false -backend-config="envs/${{ matrix.target }}.tfbackend"
+          # -lock=false is mandatory, not an optimisation: the plan identity holds
+          # Storage Blob Data READER on the state container and cannot write a lock.
+          terraform plan -input=false -lock=false -no-color \
+            -var-file="envs/${{ matrix.target }}.tfvars" | tee plan.txt
+
+      - name: summary
+        if: always()
+        working-directory: ${{ matrix.stack }}
+        run: |
+          {
+            echo "### \`${{ matrix.stack }}\` — \`${{ matrix.target }}\`"
+            echo '```terraform'
+            tail -c 60000 plan.txt || echo "no plan output"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

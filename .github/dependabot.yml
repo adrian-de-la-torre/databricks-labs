@@ -1,0 +1,9 @@
+version: 2
+updates:
+  # Actions pinned to a major tag calcify silently. The terraform ecosystem is
+  # deliberately absent: weekly provider bumps against a single stack with one
+  # author is churn, and it earns its place at the second stack.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

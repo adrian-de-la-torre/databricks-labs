@@ -1,0 +1,36 @@
+name: ci
+
+# Holds no credentials and declares no environment, so it is safe on fork pull
+# requests. Everything here runs without touching Azure.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.16.1
+          terraform_wrapper: false
+
+      - uses: terraform-linters/setup-tflint@v5
+        with:
+          tflint_version: v0.64.0
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      # pre-commit is the single definition of the gate. Running it here rather
+      # than re-listing the checks is what keeps local and CI from drifting apart.
+      - run: pip install pre-commit==4.6.2
+      - run: tflint --init
+      - run: pre-commit run --all-files --show-diff-on-failure
