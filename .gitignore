@@ -38,3 +38,8 @@ __pycache__/
 # override is not. settings.local.json is where anything non-Anthropic would live,
 # and it must never reach a public repository.
 .claude/settings.local.json
+
+# Editor and tooling backups. One reached a commit because two agents edited
+# this repository at the same time; the fix is to make it unstageable.
+*.bak
+*.orig
