@@ -25,7 +25,7 @@ env:
   # infra/bootstrap and infra/stacks/account are absent on purpose. Both are
   # applied from a laptop: bootstrap defines the identities CI runs as, and
   # account needs Databricks account admin, which Azure RBAC does not confer.
-  STACK_ORDER: platform governance
+  STACK_ORDER: platform
 
 jobs:
   discover:

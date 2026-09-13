@@ -30,6 +30,7 @@ resource "azurerm_storage_account" "catalog" {
   # This account holds catalog data. Destroying it is never recoverable from
   # Terraform, and the point of this whole stack is that the data outlives the
   # workspace. Removing this block has to be a deliberate, reviewable act.
+
   lifecycle {
     prevent_destroy = true
   }
