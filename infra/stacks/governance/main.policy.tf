@@ -13,10 +13,15 @@ resource "databricks_cluster_policy" "laboratory" {
       value = var.autotermination_minutes
     }
 
+    # isOptional matters more than it looks. Without it the field is REQUIRED,
+    # which bans single-node clusters outright -- a cost-control policy that
+    # forbids the cheapest configuration there is. The ceiling still applies to
+    # any cluster that does autoscale.
     "autoscale.max_workers" = {
       type         = "range"
       maxValue     = var.max_workers
       defaultValue = 2
+      isOptional   = true
     }
 
     # Node families verified against this workspace with
