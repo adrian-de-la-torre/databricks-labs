@@ -8,22 +8,18 @@ locals {
 # mistake would take the governance of an entire region with it.
 data "databricks_current_metastore" "this" {}
 
-resource "databricks_storage_credential" "catalog" {
-  name  = "sc-${local.catalog_name}"
-  owner = var.admin_group
-
-  azure_managed_identity {
-    access_connector_id = var.access_connector_id
-  }
-
-  comment = "Managed identity of the access connector owned by the platform stack."
+# Created by the account stack, not here: registering a storage credential
+# requires a human Databricks account admin, and CI is a service principal. Read
+# by name so this stack stays CI-applied.
+data "databricks_storage_credential" "catalog" {
+  name = var.storage_credential_name
 }
 
 resource "databricks_external_location" "catalog" {
   name            = "el-${local.catalog_name}"
   owner           = var.admin_group
   url             = var.catalog_storage_url
-  credential_name = databricks_storage_credential.catalog.name
+  credential_name = data.databricks_storage_credential.catalog.name
 
   comment = "ADLS Gen2 container in our own resource group, outliving the workspace."
 }

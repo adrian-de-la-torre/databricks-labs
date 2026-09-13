@@ -31,3 +31,23 @@ variable "ci_application_ids" {
   description = "Entra application ids of the CI identities that need account-level presence."
   type        = map(string)
 }
+
+variable "workspace_url" {
+  description = "Workspace URL, from the platform stack output."
+  type        = string
+}
+
+variable "workspace_resource_id" {
+  description = "ARM id of the workspace, used by the workspace-plane provider."
+  type        = string
+}
+
+variable "access_connector_id" {
+  description = "ARM id of the access connector backing the storage credential."
+  type        = string
+}
+
+variable "environment" {
+  description = "Deployment environment. Part of the storage credential name."
+  type        = string
+}

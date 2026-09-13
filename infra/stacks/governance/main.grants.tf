@@ -21,14 +21,3 @@ resource "databricks_grants" "external_location" {
     ]
   }
 }
-
-resource "databricks_grants" "storage_credential" {
-  storage_credential = databricks_storage_credential.catalog.id
-
-  grant {
-    principal = var.admin_group
-    privileges = [
-      "ALL_PRIVILEGES",
-    ]
-  }
-}

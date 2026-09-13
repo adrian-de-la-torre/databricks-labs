@@ -23,9 +23,9 @@ variable "workspace_id" {
   description = "Numeric workspace id, used to bind the catalog to this workspace only."
 }
 
-variable "access_connector_id" {
+variable "storage_credential_name" {
   type        = string
-  description = "ARM id of the access connector whose managed identity reads the catalog storage."
+  description = "Storage credential registered by the account stack. Referenced by name."
 }
 
 variable "catalog_storage_url" {
