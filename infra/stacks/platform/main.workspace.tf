@@ -27,9 +27,20 @@ resource "azurerm_databricks_workspace" "this" {
   }
 
   # Secure cluster connectivity: cluster nodes get no public IP address.
-  public_network_access_enabled         = true
-  network_security_group_rules_required = "NoAzureDatabricksRules"
-  customer_managed_key_enabled          = false
+  public_network_access_enabled = true
+
+  # AllRules, not NoAzureDatabricksRules.
+  #
+  # NoAzureDatabricksRules tells Azure Databricks to omit the control-plane rules
+  # from the network security group, which is correct ONLY for a workspace using
+  # back-end Private Link. Without it the group ends up with worker-to-worker,
+  # worker-to-sql, worker-to-storage and worker-to-eventhub rules and nothing
+  # allowing the node to reach the control plane. The node boots, never
+  # registers, and the cluster reports "Finding instances for new nodes" until it
+  # gives up -- a message about capacity for a problem that is about routing.
+  network_security_group_rules_required = "AllRules"
+
+  customer_managed_key_enabled = false
 
   tags = local.tags
 
