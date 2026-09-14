@@ -22,6 +22,13 @@ resource "azurerm_subnet" "host" {
   virtual_network_name = azurerm_virtual_network.this.name
   address_prefixes     = [cidrsubnet(var.address_space, 1, 0)]
 
+  # Lets the catalog storage account accept this subnet by id instead of by
+  # public IP. Cluster nodes have no public address, so without this the
+  # account's firewall has nothing to recognise them by.
+  service_endpoint {
+    service = "Microsoft.Storage"
+  }
+
   delegation {
     name = "databricks"
     service_delegation {
@@ -40,6 +47,13 @@ resource "azurerm_subnet" "container" {
   resource_group_name  = azurerm_resource_group.this.name
   virtual_network_name = azurerm_virtual_network.this.name
   address_prefixes     = [cidrsubnet(var.address_space, 1, 1)]
+
+  # Lets the catalog storage account accept this subnet by id instead of by
+  # public IP. Cluster nodes have no public address, so without this the
+  # account's firewall has nothing to recognise them by.
+  service_endpoint {
+    service = "Microsoft.Storage"
+  }
 
   delegation {
     name = "databricks"

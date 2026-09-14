@@ -4,23 +4,6 @@ data "azurerm_subscription" "current" {}
 # its managed resource group. That account is owned by the workspace: destroy the
 # workspace and the data goes with it. This one is ours, in our resource group,
 # under our Terraform, and it survives a workspace being rebuilt.
-#
-# AZU-0012 is open, not dismissed: this account has no network rules, so its
-# default action allows access from any network. Closing it is a two-part change
-# and both parts have to land together, or the clusters lose the catalog:
-#
-#   1. service_endpoints = ["Microsoft.Storage"] on snet-host and snet-container
-#      in main.network.tf. Neither subnet has any service endpoint today.
-#   2. network_rules on this account with default_action = "Deny",
-#      bypass = ["AzureServices"] for the access connector, and both subnet ids.
-#
-# It is suppressed rather than fixed because it cannot be verified right now:
-# enable_nat_gateway is false in dev, so no cluster starts, so nothing can prove
-# the workspace still reaches the catalog after the account is closed. Turn the
-# NAT gateway on, make both changes, start a cluster, read a managed table.
-# shared_access_key_enabled is already false, so the key path is shut regardless.
-#
-#trivy:ignore:AZU-0012 exp:2026-10-15
 resource "azurerm_storage_account" "catalog" {
   name                = local.storage_account_name
   resource_group_name = azurerm_resource_group.this.name
@@ -41,6 +24,37 @@ resource "azurerm_storage_account" "catalog" {
   # No shared key is ever needed, so leaving them enabled would only widen the
   # blast radius of a leaked key that nothing uses.
   shared_access_key_enabled = false
+
+  # Deny by default, and name the two things that are allowed through.
+  #
+  # The subnets get in by id, through the Microsoft.Storage service endpoint
+  # declared on each of them: cluster nodes have no public address, so there is
+  # no IP for an ip_rules entry to match.
+  #
+  # The access connector gets in as a resource instance. Unity Catalog reaches
+  # this account from the control plane, outside the virtual network, so the
+  # subnet rules do not cover it.
+  #
+  # bypass is None on purpose. Enabling the trusted Azure services exception
+  # would admit every access connector in the tenant, which is wider than this
+  # account needs and wider than the resource instance rule below, so Databricks
+  # documents turning it off:
+  # https://learn.microsoft.com/azure/databricks/connect/unity-catalog/cloud-storage/azure-managed-identities
+  #
+  # That choice trips AZU-0010, which asks for the bypass this account is
+  # deliberately not granting. The check is generic and the guidance here is the
+  # storage provider's own, so the check loses. No expiry: this is a decision,
+  # not debt waiting for a better moment.
+  #trivy:ignore:AZU-0010
+  network_rules {
+    default_action             = "Deny"
+    bypass                     = ["None"]
+    virtual_network_subnet_ids = [azurerm_subnet.host.id, azurerm_subnet.container.id]
+
+    private_link_access {
+      endpoint_resource_id = azurerm_databricks_access_connector.this.id
+    }
+  }
 
   tags = local.tags
 
