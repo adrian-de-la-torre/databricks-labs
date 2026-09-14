@@ -33,11 +33,25 @@ resource "azurerm_databricks_workspace" "this" {
   #
   # NoAzureDatabricksRules tells Azure Databricks to omit the control-plane rules
   # from the network security group, which is correct ONLY for a workspace using
-  # back-end Private Link. Without it the group ends up with worker-to-worker,
-  # worker-to-sql, worker-to-storage and worker-to-eventhub rules and nothing
-  # allowing the node to reach the control plane. The node boots, never
-  # registers, and the cluster reports "Finding instances for new nodes" until it
-  # gives up -- a message about capacity for a problem that is about routing.
+  # back-end Private Link. Without it the group holds worker-to-worker,
+  # worker-to-sql, worker-to-storage and worker-to-eventhub, and omits the one
+  # rule that matters:
+  #
+  #   Outbound TCP  VirtualNetwork -> AzureDatabricks  443, 3306, 8443-8451
+  #
+  # 8443 is the call from the compute plane to the control plane. Without it the
+  # node boots, never registers, and the cluster reports "Finding instances for
+  # new nodes" until it gives up -- a message about capacity for a problem that
+  # is about routing. The rule is named worker-to-databricks-webapp and is
+  # documented as Default, meaning always required:
+  # https://learn.microsoft.com/azure/databricks/security/network/classic/vnet-inject
+  #
+  # The field is mutable, but Azure rejects the update while any cluster is
+  # active (WorkspaceUpdateNotAllowed), which is circular: the cluster that keeps
+  # the workspace locked is the one failing for want of the rule. Terraform
+  # records the new value in state even when that call returns 400, so a later
+  # plan reports "No changes" over a change that never happened. Terminate every
+  # cluster first, and verify against Azure rather than against the plan.
   network_security_group_rules_required = "AllRules"
 
   customer_managed_key_enabled = false
