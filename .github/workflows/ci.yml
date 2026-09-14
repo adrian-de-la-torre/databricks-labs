@@ -25,6 +25,11 @@ jobs:
         with:
           tflint_version: v0.64.0
 
+      - uses: aquasecurity/setup-trivy@v0.3.1
+        with:
+          version: v0.74.0
+          cache: true
+
       - uses: actions/setup-python@v6
         with:
           python-version: "3.13"

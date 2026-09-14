@@ -11,8 +11,25 @@ repos:
         args: [--args=--config=__GIT_WORKING_DIR__/.tflint.hcl]
       # trivy was already installed and the gate ran no scanner at all.
       # HIGH,CRITICAL only: a gate that fires on advisories gets disabled.
+      #
+      # The binary comes from PATH, as it does for terraform and tflint, and CI
+      # installs it in the same pinned version. --hook-config=--tool-version is
+      # the documented alternative and does not work here: its downloader fails
+      # to match trivy's macOS-ARM64 release asset, so it would break the gate
+      # on a laptop while passing on a Linux runner.
       - id: terraform_trivy
-        args: [--args=--severity=HIGH,CRITICAL]
+        args:
+          - --args=--severity=HIGH,CRITICAL
+          # Use the checks embedded in the binary instead of fetching the bundle
+          # at run time. Two reasons, one of which already bit: the published
+          # bundle is ahead of trivy v0.74.0 and its AWS checks reference Rego
+          # helpers this version does not have, so the loader aborts before it
+          # scans anything. And a gate that downloads its own rules is not
+          # reproducible: it can go red without a commit.
+          - --args=--skip-check-update
+          # Only Terraform lives here. Not loading the Helm, Kubernetes,
+          # CloudFormation and Ansible scanners keeps the surface honest.
+          - --args=--misconfig-scanners=terraform
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
