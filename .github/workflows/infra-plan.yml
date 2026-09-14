@@ -22,7 +22,7 @@ jobs:
     outputs:
       targets: ${{ steps.find.outputs.targets }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - id: find
         run: |
           # Only the CI-applied stacks. infra/bootstrap and infra/stacks/account
@@ -42,9 +42,9 @@ jobs:
       matrix:
         include: ${{ fromJson(needs.discover.outputs.targets) }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
-      - uses: azure/login@v2
+      - uses: azure/login@v3
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID_PLAN }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
