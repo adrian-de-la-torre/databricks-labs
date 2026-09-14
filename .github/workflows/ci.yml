@@ -37,5 +37,11 @@ jobs:
       # pre-commit is the single definition of the gate. Running it here rather
       # than re-listing the checks is what keeps local and CI from drifting apart.
       - run: pip install pre-commit==4.6.2
+      # Authenticated, because tflint fetches the azurerm ruleset from the GitHub
+      # releases API and the runner's anonymous quota is shared across every job
+      # on that IP. Unauthenticated it fails as "API rate limit exceeded" at
+      # random, which reads like a broken pin rather than a shared quota.
       - run: tflint --init
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: pre-commit run --all-files --show-diff-on-failure
