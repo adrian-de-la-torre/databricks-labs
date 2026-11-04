@@ -39,8 +39,11 @@ storage credentials, grants, metastores, groups or budgets.
 
 ## Where things are applied
 
-The platform is applied from CI through OpenID Connect, with no stored credentials.
-Two steps genuinely cannot be, and are documented rather than disguised:
+The `platform` stack is applied from CI through OpenID Connect, with no stored
+credentials, one deployment per run and only when someone dispatches `infra-apply`.
+`infra/bootstrap`, `infra/stacks/account` and `infra/stacks/governance` are applied
+from a laptop, where their plan is read before it is applied. Two steps cannot be
+automated at all, and are documented rather than disguised:
 
 1. `infra/bootstrap/state-store.sh` runs once from a laptop. The storage account that
    holds Terraform state cannot hold its own state.

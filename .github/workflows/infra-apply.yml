@@ -1,11 +1,11 @@
 name: infra-apply
 
-# Manual only, and one deployment per run. Until 04/11 this workflow also ran on
-# every push to main and applied with -auto-approve, so merging a pull request
-# was the approval, for every deployment at once. Two of the deployments host a
-# product that a grant or a network change can break, so an apply now happens
-# when someone asks for it, for the deployment they name, against main as it is
-# at that moment.
+# Manual only, one deployment per run, from main only, and the platform stack
+# only. Until 04/11 this workflow also ran on every push to main and applied
+# with -auto-approve, so merging a pull request was the approval, for every
+# deployment at once. Two of the deployments host a product that a grant or a
+# network change can break, so an apply now happens when someone asks for it,
+# for the deployment they name, against main as it is at that moment.
 on:
   workflow_dispatch:
     inputs:
@@ -23,17 +23,21 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  # The layering order, declared once and in the only place that enforces it.
+  # The stacks CI applies, in order, declared once.
   #
   # A GitHub matrix does NOT guarantee ordering, even with max-parallel: 1. An
   # earlier version of this workflow generated the matrix with `find` and relied
   # on the job sequence; governance ran before platform and failed on resources
   # that did not exist yet.
   #
-  # infra/bootstrap and infra/stacks/account are absent on purpose. Both are
-  # applied from a laptop: bootstrap defines the identities CI runs as, and
-  # account needs Databricks account admin, which Azure RBAC does not confer.
-  STACK_ORDER: platform governance
+  # Only platform, whose plan infra-plan shows on the pull request before it is
+  # merged. infra/bootstrap and infra/stacks/account are applied from a laptop:
+  # bootstrap defines the identities CI runs as, and account needs Databricks
+  # account admin, which Azure RBAC does not confer. infra/stacks/governance has
+  # been applied from a laptop too since 04/11: CI cannot plan it (infra-plan.yml
+  # says why), and -auto-approve on a plan nobody has seen would reach the grants
+  # that a running product depends on.
+  STACK_ORDER: platform
 
 jobs:
   discover:
@@ -47,6 +51,18 @@ jobs:
         env:
           TARGET: ${{ inputs.target }}
         run: |
+          # workflow_dispatch lets whoever starts a run pick any branch or tag,
+          # and the run applies the code of that ref. The federated credential
+          # matches the GitHub environment, not the branch, so this check is
+          # what keeps an apply to main as it is, rather than to a branch
+          # nobody has reviewed. A branch can remove the check from its own copy
+          # of this file, so each GitHub environment also admits main only, in
+          # its deployment branch policy, which GitHub enforces before the job
+          # can get a token.
+          if [[ "${GITHUB_REF}" != "refs/heads/main" ]]; then
+            echo "::error::infra-apply runs from main only, and this run was started from ${GITHUB_REF}"
+            exit 1
+          fi
           # The input is free text, so it is checked against the envs/ files
           # rather than trusted. The GitHub environment, and with it the apply
           # identity, is the environment half of the name.
