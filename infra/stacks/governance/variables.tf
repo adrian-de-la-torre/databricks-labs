@@ -8,29 +8,35 @@ variable "environment" {
   }
 }
 
-variable "workspace_url" {
+variable "location" {
   type        = string
-  description = "Workspace URL, from the platform stack output."
+  description = "Region of the deployment: the second half of its envs/<environment>.<location> name. Locates the platform state this stack reads."
+
+  validation {
+    condition     = can(regex("^[a-z]+$", var.location))
+    error_message = "location is an Azure region name, for example northeurope."
+  }
 }
 
-variable "workspace_resource_id" {
+variable "state_storage_account_name" {
   type        = string
-  description = "ARM id of the workspace, used by the provider to authenticate through Azure."
-}
+  description = <<-EOT
+    Storage account holding Terraform state, where the platform state is read.
 
-variable "workspace_id" {
-  type        = string
-  description = "Numeric workspace id, used to bind the catalog to this workspace only."
+    Derived from the subscription id, so it is resolved when the plan runs and
+    never committed (ADR-0005): set TF_VAR_state_storage_account_name to the
+    output of infra/bootstrap/state-store.sh --name.
+  EOT
+
+  validation {
+    condition     = can(regex("^sttfstate[0-9a-f]{8}$", var.state_storage_account_name))
+    error_message = "state_storage_account_name is sttfstate plus eight hex digits, as state-store.sh --name prints it."
+  }
 }
 
 variable "storage_credential_name" {
   type        = string
   description = "Storage credential registered by the account stack. Referenced by name."
-}
-
-variable "catalog_storage_url" {
-  type        = string
-  description = "abfss:// URL of the container backing managed tables."
 }
 
 variable "admin_group" {
