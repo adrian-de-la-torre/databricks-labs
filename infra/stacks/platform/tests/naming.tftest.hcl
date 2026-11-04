@@ -69,6 +69,42 @@ run "names_and_tags_derive_from_naming_tf" {
     condition     = can(regex("^[a-z0-9]{3,24}$", azurerm_storage_account.catalog.name))
     error_message = "catalog storage account name is not 3-24 lowercase alphanumeric characters"
   }
+
+  assert {
+    condition     = azurerm_network_security_perimeter.this.name == "nsp-dbxlab-dev-sdc"
+    error_message = "network security perimeter name does not follow the naming.tf suffix"
+  }
+
+  # The regional tag, never the global one, and spelled the way Azure spells it.
+  # A tag that names no region matches nothing, so the failure would show up as
+  # serverless compute losing the catalog, not as a plan error.
+  assert {
+    condition     = azurerm_network_security_perimeter_access_rule.serverless.service_tags == tolist(["AzureDatabricksServerless.SwedenCentral"])
+    error_message = "the perimeter must admit the regional AzureDatabricksServerless tag of the workspace region"
+  }
+
+  # Enforced mode bypasses the storage account's own firewall, which is what
+  # admits classic clusters and the access connector. Learning is not a phase
+  # here; it is the configuration Databricks recommends keeping.
+  assert {
+    condition     = azurerm_network_security_perimeter_association.catalog.access_mode == "Learning"
+    error_message = "the catalog storage association must stay in Learning (transition) mode"
+  }
+}
+
+# The UK regions are where a naive capitalisation of the location goes wrong:
+# the tag is UKSouth, not Uksouth.
+run "serverless_tag_spells_the_region_the_way_azure_does" {
+  command = plan
+
+  variables {
+    location = "uksouth"
+  }
+
+  assert {
+    condition     = azurerm_network_security_perimeter_access_rule.serverless.service_tags == tolist(["AzureDatabricksServerless.UKSouth"])
+    error_message = "service tag region spelling does not match Azure's for uksouth"
+  }
 }
 
 # Azure Databricks does not exist in every region, and the variable says so.
