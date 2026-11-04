@@ -9,6 +9,13 @@
 # Idempotent. Running it twice changes nothing.
 #
 # Usage:  az login && ./state-store.sh
+#         ./state-store.sh --name     print the storage account name, create nothing
+#
+# The name is derived from the subscription id and is not committed anywhere
+# (ADR-0005). --name is how every terraform init gets it,
+#   -backend-config="storage_account_name=$(infra/bootstrap/state-store.sh --name)"
+# and how the stacks that read another stack's state get it, as
+# TF_VAR_state_storage_account_name. CI calls it the same way.
 #
 set -euo pipefail
 
@@ -19,6 +26,11 @@ SUBSCRIPTION_ID="$(az account show --query id -o tsv)"
 # Deterministic, globally unique, one state account per subscription.
 SUFFIX="$(printf '%s' "$SUBSCRIPTION_ID" | shasum -a 256 | cut -c1-8)"
 STORAGE_ACCOUNT="sttfstate${SUFFIX}"
+
+if [[ "${1:-}" == "--name" ]]; then
+  echo "${STORAGE_ACCOUNT}"
+  exit 0
+fi
 
 echo "Subscription : ${SUBSCRIPTION_ID}"
 echo "Storage      : ${STORAGE_ACCOUNT}"
@@ -90,10 +102,9 @@ done
 
 cat <<EOF
 
-Done. Backend configuration for envs/*.tfbackend:
+Done. envs/*.tfbackend carry the resource group, the container and the key.
+The storage account name is passed at init instead of committed:
 
-  resource_group_name  = "${RESOURCE_GROUP}"
-  storage_account_name = "${STORAGE_ACCOUNT}"
-  container_name       = "tfstate"
-  use_azuread_auth     = true
+  terraform init -backend-config=envs/<deployment>.tfbackend \
+    -backend-config="storage_account_name=\$(infra/bootstrap/state-store.sh --name)"
 EOF

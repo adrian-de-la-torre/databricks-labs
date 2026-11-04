@@ -18,7 +18,7 @@ data "databricks_storage_credential" "catalog" {
 resource "databricks_external_location" "catalog" {
   name            = "el-${local.catalog_name}"
   owner           = var.admin_group
-  url             = var.catalog_storage_url
+  url             = local.platform.catalog_storage_url
   credential_name = data.databricks_storage_credential.catalog.name
 
   comment = "ADLS Gen2 container in our own resource group, outliving the workspace."
@@ -30,7 +30,7 @@ resource "databricks_external_location" "catalog" {
 resource "databricks_catalog" "this" {
   name         = local.catalog_name
   owner        = var.admin_group
-  storage_root = var.catalog_storage_url
+  storage_root = local.platform.catalog_storage_url
   comment      = "Laboratory data for the ${var.environment} environment."
 
   # A catalog defaults to OPEN, which means every workspace attached to the
@@ -49,7 +49,7 @@ resource "databricks_catalog" "this" {
 resource "databricks_workspace_binding" "catalog" {
   securable_name = databricks_catalog.this.name
   securable_type = "catalog"
-  workspace_id   = var.workspace_id
+  workspace_id   = local.workspace_id
   binding_type   = "BINDING_TYPE_READ_WRITE"
 }
 

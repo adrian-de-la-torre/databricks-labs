@@ -1,10 +1,18 @@
 name: infra-apply
 
+# Manual only, one deployment per run, from main only, and the platform stack
+# only. Until 04/11 this workflow also ran on every push to main and applied
+# with -auto-approve, so merging a pull request was the approval, for every
+# deployment at once. Two of the deployments host a product that a grant or a
+# network change can break, so an apply now happens when someone asks for it,
+# for the deployment they name, against main as it is at that moment.
 on:
-  push:
-    branches: [main]
-    paths: ["infra/**", ".github/workflows/infra-*.yml"]
   workflow_dispatch:
+    inputs:
+      target:
+        description: "Deployment to apply, as <environment>.<region>: the name of an envs/ file pair, for example dev.northeurope."
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -15,50 +23,100 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  # The layering order, declared once and in the only place that enforces it.
+  # The stacks CI applies, in order, declared once.
   #
   # A GitHub matrix does NOT guarantee ordering, even with max-parallel: 1. An
   # earlier version of this workflow generated the matrix with `find` and relied
   # on the job sequence; governance ran before platform and failed on resources
   # that did not exist yet.
   #
-  # infra/bootstrap and infra/stacks/account are absent on purpose. Both are
-  # applied from a laptop: bootstrap defines the identities CI runs as, and
-  # account needs Databricks account admin, which Azure RBAC does not confer.
-  STACK_ORDER: platform governance
+  # Only platform, whose plan infra-plan shows on the pull request before it is
+  # merged. infra/bootstrap and infra/stacks/account are applied from a laptop:
+  # bootstrap defines the identities CI runs as, and account needs Databricks
+  # account admin, which Azure RBAC does not confer. infra/stacks/governance has
+  # been applied from a laptop too since 04/11: CI cannot plan it (infra-plan.yml
+  # says why), and -auto-approve on a plan nobody has seen would reach the grants
+  # that a running product depends on.
+  STACK_ORDER: platform
 
 jobs:
   discover:
     runs-on: ubuntu-latest
     outputs:
-      targets: ${{ steps.find.outputs.targets }}
+      target: ${{ steps.check.outputs.target }}
+      environment: ${{ steps.check.outputs.environment }}
     steps:
       - uses: actions/checkout@v7
-      - id: find
+      - id: check
+        env:
+          TARGET: ${{ inputs.target }}
         run: |
-          # One job per deployment target; stacks are applied in order INSIDE it.
-          targets=$(find infra/stacks/platform/envs -name '*.tfvars' \
-            | sed -E 's|.*/envs/(.*)\.tfvars|\1|' \
-            | sed -E 's|^([a-z]+)\.[a-z]+$|{"target":"&","environment":"\1"}|' \
-            | jq -sc .)
-          echo "targets=${targets}" >> "$GITHUB_OUTPUT"
+          # workflow_dispatch lets whoever starts a run pick any branch or tag,
+          # and the run applies the code of that ref. The federated credential
+          # matches the GitHub environment, not the branch, so this check is
+          # what keeps an apply to main as it is, rather than to a branch
+          # nobody has reviewed. A branch can remove the check from its own copy
+          # of this file, so each GitHub environment also admits main only, in
+          # its deployment branch policy, which GitHub enforces before the job
+          # can get a token.
+          if [[ "${GITHUB_REF}" != "refs/heads/main" ]]; then
+            echo "::error::infra-apply runs from main only, and this run was started from ${GITHUB_REF}"
+            exit 1
+          fi
+          # The input is free text, so it is checked against the envs/ files
+          # rather than trusted. The GitHub environment, and with it the apply
+          # identity, is the environment half of the name.
+          if [[ ! "${TARGET}" =~ ^[a-z]+\.[a-z]+$ || ! -f "infra/stacks/platform/envs/${TARGET}.tfvars" ]]; then
+            echo "::error::not a deployment: there is no infra/stacks/platform/envs/<target>.tfvars for that name"
+            exit 1
+          fi
+          echo "target=${TARGET}" >> "$GITHUB_OUTPUT"
+          echo "environment=${TARGET%%.*}" >> "$GITHUB_OUTPUT"
 
   apply:
     needs: discover
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include: ${{ fromJson(needs.discover.outputs.targets) }}
-    environment: ${{ matrix.environment }}
+    environment: ${{ needs.discover.outputs.environment }}
+    # Secrets, for the reason given in infra-plan.yml: a variable is printed in
+    # the step header before a mask can exist. AZURE_CLIENT_ID is a secret of
+    # the GitHub environment, so each environment signs in as its own identity.
+    env:
+      ARM_USE_OIDC: "true"
+      ARM_USE_AZUREAD: "true"
+      ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      TARGET: ${{ needs.discover.outputs.target }}
     steps:
       - uses: actions/checkout@v7
 
+      - name: mask
+        run: |
+          echo "::add-mask::${GITHUB_REPOSITORY_OWNER_ID}"
+          echo "::add-mask::${GITHUB_REPOSITORY_ID}"
+
+      # As in infra-plan.yml: which secrets an apply needs, and only whether
+      # each is set. AZURE_CLIENT_ID belongs to the GitHub environment.
+      - name: secrets
+        env:
+          PRESENT: ${{ secrets.AZURE_CLIENT_ID != '' && secrets.AZURE_TENANT_ID != '' && secrets.AZURE_SUBSCRIPTION_ID != '' }}
+        run: |
+          if [[ "${PRESENT}" != "true" ]]; then
+            echo "::error::AZURE_TENANT_ID and AZURE_SUBSCRIPTION_ID must be repository secrets, and AZURE_CLIENT_ID a secret of the ${{ needs.discover.outputs.environment }} environment (ADR-0005); at least one is not set"
+            exit 1
+          fi
+
       - uses: azure/login@v3
         with:
-          client-id: ${{ vars.AZURE_CLIENT_ID }}
-          tenant-id: ${{ vars.AZURE_TENANT_ID }}
-          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: state store
+        run: |
+          name="$(infra/bootstrap/state-store.sh --name)"
+          echo "::add-mask::${name}"
+          echo "TF_VAR_state_storage_account_name=${name}" >> "$GITHUB_ENV"
 
       - uses: hashicorp/setup-terraform@v3
         with:
@@ -66,22 +124,19 @@ jobs:
           terraform_wrapper: false
 
       - name: apply stacks in order
-        env:
-          ARM_USE_OIDC: "true"
-          ARM_USE_AZUREAD: "true"
-          ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
-          ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
-          ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+        shell: bash
         run: |
           set -euo pipefail
+          redact="python3 ${GITHUB_WORKSPACE}/.github/scan/identifiers.py --redact"
           for stack in ${STACK_ORDER}; do
             dir="infra/stacks/${stack}"
-            echo "::group::apply ${stack} (${{ matrix.target }})"
-            terraform -chdir="${dir}" init -input=false \
-              -backend-config="envs/${{ matrix.target }}.tfbackend"
-            # Plan and apply against the merged commit. A plan carried from the
-            # pull request would have been computed against pre-merge state.
+            echo "::group::apply ${stack} (${TARGET})"
+            terraform -chdir="${dir}" init -input=false -no-color \
+              -backend-config="envs/${TARGET}.tfbackend" \
+              -backend-config="storage_account_name=${TF_VAR_state_storage_account_name}" 2>&1 | ${redact}
+            # Plan and apply against main as it is now. A plan carried from the
+            # pull request would have been computed against older state.
             terraform -chdir="${dir}" apply -input=false -auto-approve -no-color \
-              -var-file="envs/${{ matrix.target }}.tfvars"
+              -var-file="envs/${TARGET}.tfvars" 2>&1 | ${redact}
             echo "::endgroup::"
           done

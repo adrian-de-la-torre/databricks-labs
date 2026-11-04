@@ -3,7 +3,7 @@ output "platform_admins_group" {
   value       = databricks_group.platform_admins.display_name
 }
 
-output "storage_credential_name" {
-  description = "Credential the governance stack references by name."
-  value       = databricks_storage_credential.catalog.name
+output "storage_credential_names" {
+  description = "Credential each governance deployment references by name, keyed like var.deployments."
+  value       = { for key, credential in databricks_storage_credential.catalog : key => credential.name }
 }

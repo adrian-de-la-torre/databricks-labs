@@ -3,6 +3,11 @@ output "workspace_url" {
   value       = "https://${azurerm_databricks_workspace.this.workspace_url}"
 }
 
+output "workspace_id" {
+  description = "Numeric workspace id. Consumed by the account stack, which assigns the admin group, and by the governance stack, which binds the catalog."
+  value       = azurerm_databricks_workspace.this.workspace_id
+}
+
 output "workspace_resource_id" {
   description = "ARM resource id, used by the databricks provider to authenticate via Azure CLI or OIDC."
   value       = azurerm_databricks_workspace.this.id

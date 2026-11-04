@@ -15,6 +15,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          # The whole history, for the commit scan at the end.
+          fetch-depth: 0
 
       - uses: hashicorp/setup-terraform@v3
         with:
@@ -45,3 +48,28 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: pre-commit run --all-files --show-diff-on-failure
+
+      # pre-commit scans the tree a pull request ends in. On a public repository
+      # every commit in it is published too, so an id that one commit adds and
+      # the next removes is still out there: the commits are scanned as well,
+      # with their messages and authors (ADR-0005).
+      #
+      # The range ends at the pull request's head rather than HEAD: what is
+      # checked out is GitHub's synthetic merge commit, which nobody pushed.
+      - name: identifiers in the pull request's commits
+        if: github.event_name == 'pull_request'
+        env:
+          BASE: ${{ github.base_ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: python3 .github/scan/identifiers.py --history "origin/${BASE}..${HEAD_SHA}"
+
+      # main takes direct pushes too, and those commits never pass through the
+      # step above, so their messages and authors would never be read. By the
+      # time this runs they are public: it cannot keep them out, but it fails
+      # while one push is all there is to rewrite. A new branch has no before.
+      - name: identifiers in the pushed commits
+        if: github.event_name == 'push' && github.event.before != '0000000000000000000000000000000000000000'
+        env:
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+        run: python3 .github/scan/identifiers.py --history "${BEFORE}..${AFTER}"

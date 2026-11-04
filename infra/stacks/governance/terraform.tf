@@ -16,7 +16,12 @@ terraform {
 # The WORKSPACE plane. account_id is deliberately absent: setting it here makes
 # the provider reject its own configuration. Authentication resolves from the
 # Azure identity -- the az CLI locally, the federated identity in CI.
+#
+# Both values come from the platform stack's state (main.platform.tf). That is
+# still a constructible configuration in the sense of ADR-0001: a data source in
+# another state is read during the plan, whereas a resource attribute in this
+# state would not be known until after the apply.
 provider "databricks" {
-  host                        = var.workspace_url
-  azure_workspace_resource_id = var.workspace_resource_id
+  host                        = local.platform.workspace_url
+  azure_workspace_resource_id = local.platform.workspace_resource_id
 }

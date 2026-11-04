@@ -1,6 +1,6 @@
 # 2. Environments are files, not directories
 
-Status: accepted
+Status: accepted. Amended by [ADR-0005](0005-identifiers-are-resolved-not-committed.md): the values are names, regions and address ranges, and identifiers are resolved when a plan runs.
 
 ## Context
 

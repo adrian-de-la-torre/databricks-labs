@@ -24,13 +24,17 @@ model, not from taste.
 | `infra/stacks/governance` | Databricks workspace plane | `databricks` (workspace) |
 | `labs/<NN>-<topic>` | One laboratory | none — Databricks bundle |
 
-They are applied in that order. It is declared in `STACK_ORDER` in
-`.github/workflows/infra-apply.yml`, which is the only place that enforces it: a
-GitHub matrix does not guarantee ordering, not even with `max-parallel: 1`. The
-order is therefore documented here and enforced there, rather than A prefix would be duplicated into
-the remote state key, so inserting a layer or reordering would stop being a rename
-and become a state migration. Laboratories keep their numeric prefix: there the
-number is an identifier, not a dependency.
+They are applied in that order. CI applies `infra/stacks/platform` alone, through
+`.github/workflows/infra-apply.yml`, after infra-plan has shown its plan on the
+pull request. The other three are applied from a laptop, where their plan is read
+before it is applied. A stack that depends on another reads its state
+(ADR-0005), so one applied out of order fails at plan time, naming the
+deployment it is missing.
+
+The order is documented here rather than encoded in directory names. A numeric
+prefix would be duplicated into the remote state key, so inserting a layer or
+reordering would stop being a rename and become a state migration. Laboratories
+keep their numeric prefix: there the number is an identifier, not a dependency.
 
 ## Environments are files, not directories
 
@@ -47,6 +51,19 @@ The deeper reason is a Databricks one. A Unity Catalog metastore is one per regi
 and scoped to the account, so it spans dev, test and prod. Under a
 directory-per-environment layout, whichever environment happened to own it would
 become a hidden dependency of the other two.
+
+## Identifiers are resolved, not committed
+
+This repository is public, so nothing committed to it identifies a deployment:
+no subscription, tenant, account, workspace or client id, no host, no email, and
+no name derived from one of them, like the state storage account's. The env
+files hold names, regions and address ranges. A plan resolves the rest when it
+runs, from another stack's state, from the state store's formula or from an
+exported variable, as ADR-0005 lists.
+
+`.github/scan/identifiers.py` refuses the rest in the gate and in CI. An
+exception goes in `.github/scan/allowed.txt` with the reason it belongs to no
+one, which makes every exception a reviewed line rather than a habit.
 
 ## Naming
 
@@ -78,9 +95,10 @@ it depends on.
 
 ## Where things are applied
 
-The platform is applied from CI. The two exceptions are stated rather than hidden:
-`infra/bootstrap/state-store.sh` runs from a laptop because the storage account that
-holds Terraform state cannot hold its own state, and one human must sign in to the
+`infra/stacks/platform` is applied from CI, and the other three stacks from a laptop,
+as Layering says. Two steps cannot be automated at all, and are stated rather than
+hidden: `infra/bootstrap/state-store.sh` runs from a laptop because the storage account
+that holds Terraform state cannot hold its own state, and one human must sign in to the
 Databricks account console once to become its first account admin, because granting
 account admin requires being one.
 

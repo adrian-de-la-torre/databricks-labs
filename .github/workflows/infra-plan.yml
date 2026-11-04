@@ -2,7 +2,7 @@ name: infra-plan
 
 on:
   pull_request:
-    paths: ["infra/**", ".github/workflows/infra-*.yml"]
+    paths: ["infra/**", ".github/workflows/infra-*.yml", ".github/scan/**"]
 
 # id-token: write is what lets the runner request an OIDC token. Without it the
 # federated credential can never be exchanged, and no amount of correct Azure
@@ -25,11 +25,19 @@ jobs:
       - uses: actions/checkout@v7
       - id: find
         run: |
-          # Only the CI-applied stacks. infra/bootstrap and infra/stacks/account
+          # Only the platform stack. infra/bootstrap and infra/stacks/account
           # are applied from a laptop, and CI can authenticate to neither: it has
           # no role on the bootstrap state container and no Databricks account
           # admin. Planning them here would fail for the right reason, noisily.
-          targets=$(find infra/stacks/platform infra/stacks/governance -path '*/envs/*.tfvars' \
+          #
+          # infra/stacks/governance is planned from a laptop too, because the
+          # plan identity holds no role in any workspace. The last five
+          # governance plans this workflow ran, 13/09 to 20/09, all stopped at
+          # "User not authorized", and every one of those jobs passed:
+          # `terraform plan | tee` without pipefail reports the status of tee.
+          # Giving this identity a Databricks role is a separate decision, since
+          # it runs code from branches nobody has reviewed yet.
+          targets=$(find infra/stacks/platform -path '*/envs/*.tfvars' \
             | sed -E 's|(.*)/envs/(.*)\.tfvars|{"stack":"\1","target":"\2"}|' \
             | jq -sc .)
           echo "targets=${targets}" >> "$GITHUB_OUTPUT"
@@ -41,34 +49,74 @@ jobs:
       fail-fast: false
       matrix:
         include: ${{ fromJson(needs.discover.outputs.targets) }}
+    # Secrets, not variables. GitHub prints a step's inputs and environment in
+    # the step's own log header, so a value that comes from vars reaches the
+    # public log before any ::add-mask:: could hide it; a secret is masked
+    # everywhere. They are identifiers rather than credentials, and ADR-0005
+    # keeps identifiers out of anything this repository publishes.
+    env:
+      ARM_USE_OIDC: "true"
+      ARM_USE_AZUREAD: "true"
+      ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID_PLAN }}
+      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
     steps:
       - uses: actions/checkout@v7
 
+      # Before anything prints them. azure/login logs the OIDC subject, which
+      # embeds both numeric ids; the runner provides them without a header line.
+      - name: mask
+        run: |
+          echo "::add-mask::${GITHUB_REPOSITORY_OWNER_ID}"
+          echo "::add-mask::${GITHUB_REPOSITORY_ID}"
+
+      # Names the secrets a plan needs when one is missing, and says only
+      # whether each is set. Dependabot's pull requests read Dependabot secrets,
+      # not Actions secrets, so these three exist in both places.
+      - name: secrets
+        env:
+          PRESENT: ${{ secrets.AZURE_CLIENT_ID_PLAN != '' && secrets.AZURE_TENANT_ID != '' && secrets.AZURE_SUBSCRIPTION_ID != '' }}
+        run: |
+          if [[ "${PRESENT}" != "true" ]]; then
+            echo "::error::AZURE_CLIENT_ID_PLAN, AZURE_TENANT_ID and AZURE_SUBSCRIPTION_ID must be repository secrets, and Dependabot secrets too (ADR-0005); at least one is not set"
+            exit 1
+          fi
+
       - uses: azure/login@v3
         with:
-          client-id: ${{ vars.AZURE_CLIENT_ID_PLAN }}
-          tenant-id: ${{ vars.AZURE_TENANT_ID }}
-          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          client-id: ${{ secrets.AZURE_CLIENT_ID_PLAN }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      # Derived from the subscription id by the script that created it, and
+      # masked before the first command that could print it.
+      - name: state store
+        run: |
+          name="$(infra/bootstrap/state-store.sh --name)"
+          echo "::add-mask::${name}"
+          echo "TF_VAR_state_storage_account_name=${name}" >> "$GITHUB_ENV"
 
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.16.1
           terraform_wrapper: false
 
+      # Every line Terraform writes goes through the scanner's redactor first:
+      # resource ids carry the subscription, and refresh lines carry ids no mask
+      # knows in advance. shell: bash is what turns on pipefail, so a failed
+      # plan fails the step through the pipe.
       - name: plan
         working-directory: ${{ matrix.stack }}
-        env:
-          ARM_USE_OIDC: "true"
-          ARM_USE_AZUREAD: "true"
-          ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID_PLAN }}
-          ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
-          ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+        shell: bash
         run: |
-          terraform init -input=false -backend-config="envs/${{ matrix.target }}.tfbackend"
+          redact="python3 ${GITHUB_WORKSPACE}/.github/scan/identifiers.py --redact"
+          terraform init -input=false -no-color \
+            -backend-config="envs/${{ matrix.target }}.tfbackend" \
+            -backend-config="storage_account_name=${TF_VAR_state_storage_account_name}" 2>&1 | ${redact}
           # -lock=false is mandatory, not an optimisation: the plan identity holds
           # Storage Blob Data READER on the state container and cannot write a lock.
           terraform plan -input=false -lock=false -no-color \
-            -var-file="envs/${{ matrix.target }}.tfvars" | tee plan.txt
+            -var-file="envs/${{ matrix.target }}.tfvars" 2>&1 | ${redact} | tee plan.txt
 
       - name: summary
         if: always()
