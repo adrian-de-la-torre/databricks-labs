@@ -15,7 +15,9 @@ The conventions that govern this repository are in [docs/CONVENTIONS.md](docs/CO
 ```
 infra/
   bootstrap/              State store, CI identities, subscription budget
-  stacks/platform/     Resource group, network, Databricks workspace
+  stacks/platform/        Resource group, network, Databricks workspace
+  stacks/account/         Databricks account plane: groups, storage credentials
+  stacks/governance/      Databricks workspace plane: catalog, grants, policies
 labs/
   <NN>-<topic>/           One experiment: bundle, results, cost
 docs/
@@ -62,10 +64,26 @@ choosing: `westeurope` currently rejects new subscriptions with
 az login
 ./infra/bootstrap/state-store.sh
 
+# The state account's name derives from the subscription id, so it is passed
+# rather than committed.
+export TF_VAR_state_storage_account_name="$(./infra/bootstrap/state-store.sh --name)"
+
 cd infra/stacks/platform
-terraform init -backend-config=envs/dev.swedencentral.tfbackend
-terraform plan  -var-file=envs/dev.swedencentral.tfvars
+terraform init -backend-config=envs/dev.northeurope.tfbackend \
+  -backend-config="storage_account_name=${TF_VAR_state_storage_account_name}"
+terraform plan -var-file=envs/dev.northeurope.tfvars
 ```
+
+The env files hold names, regions and address ranges, never identifiers
+([ADR-0005](docs/adr/0005-identifiers-are-resolved-not-committed.md)). What a
+plan needs beyond them:
+
+| Stack | Beyond `az login` and the state account |
+|---|---|
+| `infra/stacks/platform` | Nothing |
+| `infra/stacks/governance` | Nothing: the workspace comes from the platform state |
+| `infra/stacks/account` | An account-level CLI profile (`-var=databricks_cli_profile=<profile>`), which carries the account id, or `DATABRICKS_ACCOUNT_ID`; and `TF_VAR_admin_user_names` |
+| `infra/bootstrap` | `TF_VAR_github_owner_id` and `TF_VAR_github_repository_id`, from `gh api repos/<owner>/<name>` |
 
 ## Licence
 

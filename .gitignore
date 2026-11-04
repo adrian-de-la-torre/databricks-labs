@@ -9,8 +9,9 @@ tfplan
 *.tfplan
 
 # envs/*.tfvars and envs/*.tfbackend ARE committed on purpose: they are the
-# deployment coordinates of this platform and hold no secrets. Only locally
-# auto-loaded overrides are ignored.
+# deployment coordinates of this platform, and they hold names, regions and
+# ranges only. Identifiers are resolved when a plan runs (ADR-0005). Only
+# locally auto-loaded overrides are ignored.
 *.auto.tfvars
 override.tf
 override.tf.json
