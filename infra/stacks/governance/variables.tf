@@ -60,3 +60,16 @@ variable "autotermination_minutes" {
     error_message = "autotermination_minutes must be between 10 and 60: below 10 Databricks rejects it, above 60 it stops being a cost control."
   }
 }
+
+variable "catalog_users" {
+  type = object({
+    service_principals = optional(set(string), [])
+    apps               = optional(set(string), [])
+  })
+  description = <<-EOT
+    Principals outside this stack that need USE_CATALOG on the catalog, by name:
+    service principals by display name, Databricks Apps by app name. Each name
+    is resolved to an application id when the plan runs, so no id is committed.
+  EOT
+  default     = {}
+}
