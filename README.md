@@ -85,6 +85,18 @@ plan needs beyond them:
 | `infra/stacks/account` | An account-level CLI profile (`-var=databricks_cli_profile=<profile>`), which carries the account id, or `DATABRICKS_ACCOUNT_ID`; and `TF_VAR_admin_user_names` |
 | `infra/bootstrap` | `TF_VAR_github_owner_id` and `TF_VAR_github_repository_id`, from `gh api repos/<owner>/<name>` |
 
+## Before the first commit
+
+```bash
+pre-commit install
+git config user.email "$(gh api user --jq '"\(.id)+\(.login)@users.noreply.github.com"')"
+```
+
+A commit publishes its author and committer along with its files. The gate refuses
+an address that identifies someone
+([ADR-0005](docs/adr/0005-identifiers-are-resolved-not-committed.md)), and GitHub's
+noreply address is the one it accepts.
+
 ## Licence
 
 Apache-2.0. Take what is useful.

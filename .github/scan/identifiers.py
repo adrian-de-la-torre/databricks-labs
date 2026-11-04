@@ -14,6 +14,9 @@ what keeps them from coming back.
                                       removed and unchanged lines of each patch
   identifiers.py --redact             copy stdin to stdout with each match
                                       replaced by <kind>, for CI logs
+  identifiers.py --identity           scan the author and committer that the
+                                      next commit will carry, for the gate:
+                                      a commit publishes them with its files
   identifiers.py --list [REV ...]     print kind and value of each distinct
                                       match in the history; for rewriting it
                                       on a laptop, never in CI
@@ -23,9 +26,9 @@ so that a finding does not leak into the CI log that reports it. Exit status is
 1 when something matches.
 
 The patterns are those of the scanner in Agent Cost Control, a sibling project,
-plus three that only this repository needs: storage endpoints, storage account
-names derived from a subscription id, and GitHub's numeric account and
-repository ids.
+plus four that only this repository needs: storage endpoints, storage account
+names derived from a subscription id, GitHub's numeric account and repository
+ids, and the cluster policy ids that a plan prints when it refreshes state.
 Exceptions live in allowed.txt next to this file, each with its reason.
 
 Standard library only, Python 3.9 or later: pre-commit and CI run it as is.
@@ -79,6 +82,9 @@ PATTERNS: list[tuple[str, re.Pattern[str]]] = [
         ("numeric-id", r"[A-Za-z0-9_]*_id[\"']?[ \t]*[=:][ \t]*[\"']?(?P<v>[0-9]{6,})(?![0-9])"),
         # an OIDC subject in GitHub's immutable form, which embeds both numeric ids
         ("oidc-subject", r"repo:[A-Za-z0-9_.-]+@[0-9]+/[A-Za-z0-9_.-]+@[0-9]+"),
+        # a cluster policy id: sixteen uppercase hex digits, at least one of them a
+        # letter, so that a bare sixteen-digit workspace id stays a workspace-id
+        ("policy-id", r"(?<![0-9A-Za-z])(?=[0-9A-F]{0,15}[A-F])[0-9A-F]{16}(?![0-9A-Za-z])"),
     ]
 ]
 
@@ -202,6 +208,28 @@ def scan_history(revs: list[str]) -> int:
     return report(found, len(commits), "commits")
 
 
+IDENT_DATE = re.compile(r" [0-9]+ [-+][0-9]{4}$")
+
+
+def scan_identity() -> int:
+    """The author and committer the next commit will carry, read with git var
+    before the commit exists. git commit exports --author, GIT_AUTHOR_* and
+    -c user.* to its hooks, so git var reads exactly what the commit will
+    publish, which is also what a fresh clone's global configuration supplies."""
+    found: Counter[str] = Counter()
+    for var in ("GIT_AUTHOR_IDENT", "GIT_COMMITTER_IDENT"):
+        out = subprocess.run(["git", "var", var], capture_output=True, text=True)
+        if out.returncode == 0:
+            found[var] += len(matches(IDENT_DATE.sub("", out.stdout.strip())))
+    if not found:
+        print("identifiers: no identity configured, and git commit refuses without one")
+        return 0
+    status = report(found, len(found), "identities")
+    if status:
+        print("set user.email in this clone to the GitHub noreply address (ADR-0005)")
+    return status
+
+
 def list_history(revs: list[str]) -> int:
     seen: dict[str, str] = {}
     for _, path, line in history(revs, every_line=True):
@@ -237,6 +265,8 @@ def main(argv: list[str]) -> int:
         return scan_history(argv[1:])
     if argv[:1] == ["--list"]:
         return list_history(argv[1:])
+    if argv[:1] == ["--identity"]:
+        return scan_identity()
     return scan_files(argv)
 
 

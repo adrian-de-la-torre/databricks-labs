@@ -65,6 +65,12 @@ class EachPatternFires(unittest.TestCase):
         self.assertEqual(kinds('storage_account_name = "sttfstate' + "0a1b2c3d" + '"'), ["storage-account"])
         self.assertEqual(kinds("stdbxlabtestneu" + "9f8e7d6c"), ["storage-account"])
 
+    def test_cluster_policy_id(self):
+        # As a plan prints it when it refreshes a policy.
+        policy = "E0" + "6216CA" + "A0000360"
+        self.assertEqual(kinds(f"Refreshing state... [id={policy}]"), ["policy-id"])
+        self.assertEqual(kinds(f"[id=/cluster-policies/{policy}]"), ["policy-id"])
+
     def test_github_numeric_ids(self):
         self.assertEqual(kinds("github_owner_id = " + "1234567"), ["numeric-id"])
         self.assertEqual(kinds('"repository_id": ' + "98765432"), ["numeric-id"])
@@ -85,6 +91,8 @@ class WhatIsNotAnIdentifier(unittest.TestCase):
             "repo:<owner>" + AT + "<owner_id>/<repo>" + AT + "<repo_id>:<context>",
             "AADSTS700213",
             'max_clusters_per_user = 2',
+            # lowercase hex, like an abbreviated commit: not a policy id
+            "a1b2c3d4" + "e5f60718",
         ]:
             with self.subTest(text=text):
                 self.assertEqual(kinds(text), [])
@@ -189,6 +197,29 @@ class Reporting(unittest.TestCase):
         self.assertEqual(status, 1)
         self.assertEqual(len([line for line in out.splitlines() if line.endswith(":1")]), 2)
         self.assertNotIn(GUID, out)
+        self.assertNotIn("someone" + AT, out)
+
+    def test_identity_is_what_the_next_commit_would_carry(self):
+        """git exports --author and -c user.* to its hooks as these variables,
+        so the gate reads the identity before the commit publishes it."""
+        with tempfile.TemporaryDirectory() as tmp:
+            subprocess.run(["git", "init", "-q", tmp], check=True)
+            os.environ.update({
+                "GIT_AUTHOR_NAME": "a", "GIT_AUTHOR_EMAIL": "a" + AT + "example.invalid",
+                "GIT_COMMITTER_NAME": "c", "GIT_COMMITTER_EMAIL": "1234567+c" + AT + "users.noreply.github.com",
+            })
+            cwd = Path.cwd()
+            try:
+                os.chdir(tmp)
+                clean, _ = self.run_main("--identity")
+                os.environ["GIT_AUTHOR_EMAIL"] = "someone" + AT + "example.com"
+                leaky, out = self.run_main("--identity")
+            finally:
+                os.chdir(cwd)
+        self.assertEqual(clean, 0)
+        self.assertEqual(leaky, 1)
+        self.assertIn("GIT_AUTHOR_IDENT:1", out)
+        self.assertNotIn("GIT_COMMITTER_IDENT", out)
         self.assertNotIn("someone" + AT, out)
 
     def test_history_reads_what_a_commit_adds_not_what_it_removes(self):

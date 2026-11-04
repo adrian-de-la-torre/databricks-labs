@@ -40,10 +40,18 @@ Everything a plan needs beyond them is resolved when the plan runs:
 | Subscription, tenant and client ids in CI | GitHub secrets rather than variables, because GitHub masks secrets |
 
 `.github/scan/identifiers.py` enforces it in three places: the pre-commit gate,
-over every file; CI, over every commit of a pull request, messages and authors
-included; and every Terraform command in CI, whose output it redacts before
-the log sees it. Its exceptions are in `.github/scan/allowed.txt`, each with
-the reason it belongs to no one.
+over every file and over the author and committer a commit is about to carry;
+CI, over every commit of a pull request and every commit pushed to main,
+messages and authors included; and every Terraform command in CI, whose output
+it redacts before the log sees it. Its exceptions are in
+`.github/scan/allowed.txt`, each with the reason it belongs to no one.
+
+One exception is an identifier, and it is stated rather than hidden. Commits
+are authored with the account's GitHub noreply address, which carries the
+numeric account id: GitHub assigns that address, attributes commits through it,
+and publishes the same id next to the login. So the files and the workflow logs
+are kept free of the id, and commit authorship is not. The repository id, which
+a recreation changes and the federated credentials match, appears in no address.
 
 ## Consequences
 

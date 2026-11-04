@@ -62,3 +62,14 @@ jobs:
           BASE: ${{ github.base_ref }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: python3 .github/scan/identifiers.py --history "origin/${BASE}..${HEAD_SHA}"
+
+      # main takes direct pushes too, and those commits never pass through the
+      # step above, so their messages and authors would never be read. By the
+      # time this runs they are public: it cannot keep them out, but it fails
+      # while one push is all there is to rewrite. A new branch has no before.
+      - name: identifiers in the pushed commits
+        if: github.event_name == 'push' && github.event.before != '0000000000000000000000000000000000000000'
+        env:
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+        run: python3 .github/scan/identifiers.py --history "${BEFORE}..${AFTER}"

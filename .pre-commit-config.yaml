@@ -60,6 +60,20 @@ repos:
         language: system
         types: [text]
 
+      # A commit publishes more than its files: its author and committer. A
+      # fresh clone takes both from the global git configuration, which on a
+      # laptop is usually a real address, and CI reads them only after the push
+      # has published them. So the identity a commit is about to carry is
+      # scanned before the commit exists. git exports --author and -c user.*
+      # to its hooks, so what is read is what the commit will carry. CI makes
+      # no commits and skips it.
+      - id: no-identifiers-in-author
+        name: refuse an author or committer address that identifies someone
+        entry: bash -c '[ -n "${CI:-}" ] || exec python3 .github/scan/identifiers.py --identity'
+        language: system
+        pass_filenames: false
+        always_run: true
+
       # A pattern that matches nothing passes every gate, so the scanner's own
       # tests run whenever it or its allowlist changes.
       - id: identifiers-selftest

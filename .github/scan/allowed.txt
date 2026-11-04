@@ -21,6 +21,13 @@ allow ba92f5b4-2d11-453d-a403-e96b0029c9fe  # Storage Blob Data Contributor
 # examples. GitHub's noreply addresses are what it publishes in place of a real
 # one, and noreply@github.com commits every merge made in its web interface.
 allow [A-Za-z0-9._%+-]+@([A-Za-z0-9-]+\.)*invalid
+# A noreply address does carry one identifier: the numeric account id in front
+# of the login. ADR-0005 keeps that id out of the env files, and CI masks it,
+# yet every commit in this repository is authored with it, and so is every
+# commit the history rewrite maps. It is allowed here deliberately: GitHub
+# assigns that address, and its public API returns the same id next to the
+# login. The repository id, which a recreation changes and the federated
+# credentials match, is not in any address and stays refused.
 allow ([0-9]+\+)?[A-Za-z0-9-]+(\[bot\])?@users\.noreply\.github\.com
 allow noreply@github\.com
 # Dependabot signs off every commit it writes with GitHub's support address.
