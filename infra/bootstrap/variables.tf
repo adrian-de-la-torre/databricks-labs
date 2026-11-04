@@ -14,13 +14,17 @@ variable "github_repository" {
   }
 }
 
+# The two numeric ids change when the repository is recreated, and they are
+# identifiers, so neither is committed (ADR-0005). Resolve both when planning:
+#   export TF_VAR_github_owner_id="$(gh api repos/<owner>/<name> --jq .owner.id)"
+#   export TF_VAR_github_repository_id="$(gh api repos/<owner>/<name> --jq .id)"
 variable "github_owner_id" {
-  description = "Numeric GitHub account id. Part of the immutable subject format."
+  description = "Numeric GitHub account id. Part of the immutable subject format. Set with TF_VAR_github_owner_id."
   type        = number
 }
 
 variable "github_repository_id" {
-  description = "Numeric GitHub repository id. Part of the immutable subject format."
+  description = "Numeric GitHub repository id. Part of the immutable subject format. Set with TF_VAR_github_repository_id."
   type        = number
 }
 
@@ -28,9 +32,4 @@ variable "environments" {
   description = "Deployment environments that get a federated apply credential."
   type        = set(string)
   default     = ["dev"]
-}
-
-variable "state_storage_account_id" {
-  description = "Resource id of the storage account holding Terraform state."
-  type        = string
 }

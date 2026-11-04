@@ -1,5 +1,17 @@
 data "azurerm_subscription" "current" {}
 
+locals {
+  # The state store, by the formula state-store.sh created it with: eight hex
+  # digits of the SHA-256 of the subscription id. Deriving the id here keeps the
+  # subscription id out of envs/labs.tfvars (ADR-0005), and it produces the same
+  # string the role assignments were created with, so no scope changes.
+  state_storage_account_id = format(
+    "%s/resourceGroups/rg-terraform-state/providers/Microsoft.Storage/storageAccounts/sttfstate%s",
+    data.azurerm_subscription.current.id,
+    substr(sha256(data.azurerm_subscription.current.subscription_id), 0, 8),
+  )
+}
+
 # Least privilege, stated explicitly rather than reached for by habit.
 #
 # Contributor at subscription scope is genuinely required for apply, not lazily:
@@ -34,7 +46,7 @@ resource "azurerm_role_assignment" "apply_state_writer" {
   # Container scope, not account scope. The bootstrap state lives in a different
   # container, so a compromised pipeline identity cannot reach the definitions of
   # the identities themselves -- including its own.
-  scope                = "${var.state_storage_account_id}/blobServices/default/containers/tfstate"
+  scope                = "${local.state_storage_account_id}/blobServices/default/containers/tfstate"
   role_definition_name = "Storage Blob Data Contributor"
   principal_id         = azurerm_user_assigned_identity.apply[each.key].principal_id
   principal_type       = "ServicePrincipal"
@@ -44,7 +56,7 @@ resource "azurerm_role_assignment" "apply_state_writer" {
 # overwrite it. `terraform plan -lock=false` is therefore mandatory in CI, and the
 # workflow says so.
 resource "azurerm_role_assignment" "plan_state_reader" {
-  scope                = "${var.state_storage_account_id}/blobServices/default/containers/tfstate"
+  scope                = "${local.state_storage_account_id}/blobServices/default/containers/tfstate"
   role_definition_name = "Storage Blob Data Reader"
   principal_id         = azurerm_user_assigned_identity.plan.principal_id
   principal_type       = "ServicePrincipal"
