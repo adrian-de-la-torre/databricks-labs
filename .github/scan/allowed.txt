@@ -1,0 +1,34 @@
+# Exceptions to identifiers.py. Each one is a value that belongs to no
+# deployment, with the reason it is safe to publish. Adding a line here is a
+# reviewable decision, which is the point of keeping the list in the repository.
+#
+#   allow <regex>          a value that matches it entirely is not a finding
+#   ignore <glob> <regex>  in files matching glob, text matching regex is not scanned
+#
+# Comments after a value start with two spaces and a hash.
+
+# The account console. Every Azure Databricks customer uses the same host.
+allow accounts\.azuredatabricks\.net
+allow accounts\.(cloud|gcp)\.databricks\.com
+
+# Azure built-in role definitions. Their ids are the same in every tenant and
+# Microsoft publishes them; infra/bootstrap/main.identity.tf needs them for the
+# ABAC condition. Checked with `az role definition list --name <role>`.
+allow acdd72a7-3385-48ef-bd42-f606fba81ae7  # Reader
+allow ba92f5b4-2d11-453d-a403-e96b0029c9fe  # Storage Blob Data Contributor
+
+# Addresses that reach no one. The .invalid domain is reserved by RFC 6761 for
+# examples. GitHub's noreply addresses are what it publishes in place of a real
+# one, and noreply@github.com commits every merge made in its web interface.
+allow [A-Za-z0-9._%+-]+@([A-Za-z0-9-]+\.)*invalid
+allow ([0-9]+\+)?[A-Za-z0-9-]+(\[bot\])?@users\.noreply\.github\.com
+allow noreply@github\.com
+# Dependabot signs off every commit it writes with GitHub's support address.
+allow support@github\.com
+
+# Provider checksums. They are random base64 and hex, so over enough provider
+# upgrades one will contain a run of digits between two '/' or '+' characters,
+# or the letters of a token prefix, by chance alone. Blanking them first means a
+# provider upgrade can never fail the gate on noise, while the rest of every
+# lock file is still scanned.
+ignore **/.terraform.lock.hcl (h1|zh):[A-Za-z0-9+/=]+

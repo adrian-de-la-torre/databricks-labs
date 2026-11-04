@@ -50,6 +50,25 @@ repos:
         language: fail
         files: '(\.tfstate|\.tfstate\.backup|\.auto\.tfvars|\.databrickscfg)$'
 
+      # Identifiers are resolved when a plan runs and never committed
+      # (ADR-0005). Every text file is read, lock files included; the
+      # exceptions are in .github/scan/allowed.txt, each with its reason. A
+      # finding is reported as file:count, so the CI log does not repeat it.
+      - id: no-identifiers
+        name: refuse identifiers, hosts, tokens and emails
+        entry: python3 .github/scan/identifiers.py
+        language: system
+        types: [text]
+
+      # A pattern that matches nothing passes every gate, so the scanner's own
+      # tests run whenever it or its allowlist changes.
+      - id: identifiers-selftest
+        name: the identifier scanner still finds what it promises
+        entry: python3 -m unittest discover -s .github/scan -p "test_*.py"
+        language: system
+        pass_filenames: false
+        files: '^\.github/scan/'
+
       # A charset check would not work: the Spanish this repository started from
       # was written without accents and is pure ASCII. Only a wordlist catches it.
       - id: english-only
