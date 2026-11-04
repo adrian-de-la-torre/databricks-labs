@@ -93,6 +93,8 @@ class WhatIsNotAnIdentifier(unittest.TestCase):
             'max_clusters_per_user = 2',
             # lowercase hex, like an abbreviated commit: not a policy id
             "a1b2c3d4" + "e5f60718",
+            # what terraform init prints for a provider the registry signs
+            "- Installed databricks/databricks v1.131.0 (self-signed, key ID " + "ABCDEF01" + "23456789" + ")",
         ]:
             with self.subTest(text=text):
                 self.assertEqual(kinds(text), [])

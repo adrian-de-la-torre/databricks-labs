@@ -83,8 +83,10 @@ PATTERNS: list[tuple[str, re.Pattern[str]]] = [
         # an OIDC subject in GitHub's immutable form, which embeds both numeric ids
         ("oidc-subject", r"repo:[A-Za-z0-9_.-]+@[0-9]+/[A-Za-z0-9_.-]+@[0-9]+"),
         # a cluster policy id: sixteen uppercase hex digits, at least one of them a
-        # letter, so that a bare sixteen-digit workspace id stays a workspace-id
-        ("policy-id", r"(?<![0-9A-Za-z])(?=[0-9A-F]{0,15}[A-F])[0-9A-F]{16}(?![0-9A-Za-z])"),
+        # letter, so that a bare sixteen-digit workspace id stays a workspace-id.
+        # terraform init prints each provider's signing key id in the same form,
+        # and the registry publishes those, so a key id is not one.
+        ("policy-id", r"(?<![0-9A-Za-z])(?<!key ID )(?=[0-9A-F]{0,15}[A-F])[0-9A-F]{16}(?![0-9A-Za-z])"),
     ]
 ]
 
