@@ -27,6 +27,18 @@ DIGITS16 = "8" * 16
 AZURE = ".azuredatabricks" + ".net"
 
 
+def setUpModule():
+    # Reporting.setUp says why git's hook variables are dropped. They are
+    # dropped here as well, for the whole module, so that a test written outside
+    # that class cannot run git with the hook's GIT_DIR: a `git init` under it
+    # reinitializes the repository being committed to, and from a linked
+    # worktree that sets core.bare = true in the main checkout.
+    clean = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    patcher = mock.patch.dict(os.environ, clean, clear=True)
+    patcher.start()
+    unittest.addModuleCleanup(patcher.stop)
+
+
 def kinds(text: str, path: str = "x.tf") -> list[str]:
     return [kind for _, _, kind, _ in scan.matches(text, scan.ignored_for(path))]
 
