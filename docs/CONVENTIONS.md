@@ -95,9 +95,10 @@ it depends on.
 
 ## Where things are applied
 
-The platform is applied from CI. The two exceptions are stated rather than hidden:
-`infra/bootstrap/state-store.sh` runs from a laptop because the storage account that
-holds Terraform state cannot hold its own state, and one human must sign in to the
+`infra/stacks/platform` is applied from CI, and the other three stacks from a laptop,
+as Layering says. Two steps cannot be automated at all, and are stated rather than
+hidden: `infra/bootstrap/state-store.sh` runs from a laptop because the storage account
+that holds Terraform state cannot hold its own state, and one human must sign in to the
 Databricks account console once to become its first account admin, because granting
 account admin requires being one.
 
