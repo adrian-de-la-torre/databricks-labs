@@ -48,6 +48,19 @@ and scoped to the account, so it spans dev, test and prod. Under a
 directory-per-environment layout, whichever environment happened to own it would
 become a hidden dependency of the other two.
 
+## Identifiers are resolved, not committed
+
+This repository is public, so nothing committed to it identifies a deployment:
+no subscription, tenant, account, workspace or client id, no host, no email, and
+no name derived from one of them, like the state storage account's. The env
+files hold names, regions and address ranges. A plan resolves the rest when it
+runs, from another stack's state, from the state store's formula or from an
+exported variable, as ADR-0005 lists.
+
+`.github/scan/identifiers.py` refuses the rest in the gate and in CI. An
+exception goes in `.github/scan/allowed.txt` with the reason it belongs to no
+one, which makes every exception a reviewed line rather than a habit.
+
 ## Naming
 
 Azure CAF abbreviations, derived in `naming.tf` and nowhere else:
